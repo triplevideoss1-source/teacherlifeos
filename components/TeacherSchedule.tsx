@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { AppState, Lesson, ClassTemplate, Task } from '../types';
 import { useTranslation } from '../lib/translations';
 import { exportToCSV } from '../lib/exportUtils';
-import { Plus, Trash2, MapPin, Settings, X, GripVertical, Maximize2, Download, Minimize2, Palette, Clock, FileText, Edit2, Calendar } from 'lucide-react';
+import { Plus, Trash2, MapPin, Settings, X, GripVertical, Maximize2, Download, Minimize2, Palette, Clock, FileText, Edit2, Calendar, Pin, ListChecks } from 'lucide-react';
 import { soundService } from '../services/sounds';
 
 interface Props {
@@ -40,6 +40,10 @@ type ScheduledItem = {
 
 const TABLE_TIME_COLUMN_WIDTH = 70;
 const TABLE_SLOT_HEIGHT = 72;
+const toLocalDate = (dateStr: string) => {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, month - 1, day);
+};
 
 const getTaskColor = (priority: Task['priority']) => {
   if (priority === 'high') return '#ef4444';
@@ -102,6 +106,21 @@ const TeacherSchedule: React.FC<Props> = ({ state, updateState }) => {
     }, []);
 
     const scheduledItems = useMemo<ScheduledItem[]>(() => {
+        const now = new Date();
+        const dayIndex = (now.getDay() + 6) % 7; // Monday=0
+        const weekStart = new Date(now);
+        weekStart.setHours(0, 0, 0, 0);
+        weekStart.setDate(now.getDate() - dayIndex);
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 6);
+        weekEnd.setHours(23, 59, 59, 999);
+
+        const isTaskInCurrentWeek = (task: Task) => {
+            if (!task.scheduledDate) return true;
+            const taskDate = toLocalDate(task.scheduledDate);
+            return taskDate >= weekStart && taskDate <= weekEnd;
+        };
+
         const lessons: ScheduledItem[] = state.lessons.map((lesson) => ({
             id: lesson.id,
             type: 'lesson',
@@ -117,7 +136,7 @@ const TeacherSchedule: React.FC<Props> = ({ state, updateState }) => {
         }));
 
         const tasks: ScheduledItem[] = state.tasks
-            .filter((task) => !task.completed && task.scheduledDay && task.scheduledTime)
+            .filter((task) => !task.completed && task.scheduledDay && task.scheduledTime && isTaskInCurrentWeek(task))
             .map((task) => ({
                 id: task.id,
                 type: 'task',
@@ -413,9 +432,19 @@ const TeacherSchedule: React.FC<Props> = ({ state, updateState }) => {
                                             <div className="flex justify-between items-start mb-1 gap-2">
                                                 <span className="font-bold leading-tight line-clamp-2 break-words">{item.title}</span>
                                                 {item.type === 'task' ? (
-                                                    <div className="bg-white/25 px-1.5 py-0.5 rounded-md text-[7px] font-black uppercase tracking-widest shrink-0">{t('todo')}</div>
+                                                    <div
+                                                        className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white/25 text-white/90 shadow-sm"
+                                                        title={t('todo')}
+                                                    >
+                                                        <ListChecks className="w-3 h-3" />
+                                                    </div>
                                                 ) : item.isFixed ? (
-                                                    <div className="bg-white/30 px-1.5 py-0.5 rounded-md text-[7px] font-black uppercase tracking-widest shrink-0">{t('fixedEvent')}</div>
+                                                    <div
+                                                        className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white/25 text-white/90 shadow-sm"
+                                                        title={t('fixedEvent')}
+                                                    >
+                                                        <Pin className="w-3 h-3" />
+                                                    </div>
                                                 ) : null}
                                             </div>
                                             <div className="flex flex-col h-full">
@@ -664,13 +693,20 @@ const TeacherSchedule: React.FC<Props> = ({ state, updateState }) => {
                                                                 <span className={`text-[9px] font-black uppercase tracking-[0.18em] px-2 py-1 rounded-lg ${item.type === 'task' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'}`}>
                                                                     {item.type === 'task' ? t('todo') : t('classes')}
                                                                 </span>
+                                                                {item.isFixed && (
+                                                                    <span
+                                                                        className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-900/5 text-slate-600 dark:bg-white/10 dark:text-slate-200"
+                                                                        title={t('fixedEvent')}
+                                                                    >
+                                                                        <Pin className="w-3 h-3" />
+                                                                    </span>
+                                                                )}
                                                             </div>
                                                         </div>
-                                                        {(item.location || item.notes || item.isFixed) && (
+                                                        {(item.location || item.notes) && (
                                                             <div className="mt-2 flex items-center gap-3 text-[9px] font-bold text-slate-400 uppercase tracking-widest">
                                                                 {item.location && <span className="flex items-center gap-1"><MapPin className="w-2.5 h-2.5" /> {item.location}</span>}
                                                                 {item.notes && <span className="flex items-center gap-1 truncate"><FileText className="w-2.5 h-2.5" /> {item.notes}</span>}
-                                                                {item.isFixed && <span>{t('fixedEvent')}</span>}
                                                             </div>
                                                         )}
                                                     </button>

@@ -21,6 +21,7 @@ export interface Task {
   scheduledDay?: string;
   scheduledTime?: string;
   scheduledDuration?: number;
+  scheduledDate?: string;
 }
 
 export interface Lesson {

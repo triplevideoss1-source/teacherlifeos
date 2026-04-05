@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { AppState, Task, FocusSession, MuhasabahEntry } from '../types';
+import { auth } from '../firebase';
 import { exportToCSV } from '../lib/exportUtils';
 import { soundService } from '../services/sounds';
 import { useTranslation } from '../lib/translations';
@@ -127,6 +128,17 @@ const ISLAMIC_DAILY = [
 ];
 
 const WEEK_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const toLocalISODate = (date: Date) => date.toLocaleDateString('en-CA');
+const getNextOccurrenceDate = (weekday: string) => {
+  const targetIndex = WEEK_DAYS.indexOf(weekday);
+  if (targetIndex === -1) return toLocalISODate(new Date());
+  const now = new Date();
+  const currentIndex = (now.getDay() + 6) % 7; // Monday=0
+  const diff = (targetIndex - currentIndex + 7) % 7;
+  const target = new Date(now);
+  target.setDate(now.getDate() + diff);
+  return toLocalISODate(target);
+};
 
 const Dashboard: React.FC<Props> = ({ state, updateState, prayerTimes, setView }) => {
   const [quickNote, setQuickNote] = useState('');
@@ -169,17 +181,17 @@ const Dashboard: React.FC<Props> = ({ state, updateState, prayerTimes, setView }
       }
   }, []);
 
-  // Timer Logic
+  // Timer Logic — uses functional updater to avoid stale closures
   useEffect(() => {
     if (state.focusSession?.isActive) {
         timerRef.current = window.setInterval(() => {
-            updateState({
-                ...state,
+            updateState((prev: AppState) => ({
+                ...prev,
                 focusSession: {
-                    ...state.focusSession!,
-                    timeLeft: Math.max(0, state.focusSession!.timeLeft - 1)
+                    ...prev.focusSession!,
+                    timeLeft: Math.max(0, prev.focusSession!.timeLeft - 1)
                 }
-            });
+            }) as AppState);
         }, 1000);
     } else if (timerRef.current) {
         clearInterval(timerRef.current);
@@ -187,15 +199,19 @@ const Dashboard: React.FC<Props> = ({ state, updateState, prayerTimes, setView }
     return () => {
         if(timerRef.current) clearInterval(timerRef.current);
     };
-  }, [state.focusSession?.isActive, state.focusSession?.timeLeft]);
+  }, [state.focusSession?.isActive]);
 
 
   const todaysLessons = useMemo(() => state.lessons.filter(l => l.day === today).sort((a,b) => a.time.localeCompare(b.time)), [state.lessons, today]);
-    const todaysScheduledTasks = useMemo(() => {
+  const todaysScheduledTasks = useMemo(() => {
         return state.tasks
-            .filter(task => !task.completed && task.scheduledDay === today && task.scheduledTime)
+            .filter(task => {
+                if (task.completed || !task.scheduledTime) return false;
+                if (task.scheduledDate) return task.scheduledDate === todayDate;
+                return task.scheduledDay === today;
+            })
             .sort((left, right) => (left.scheduledTime || '').localeCompare(right.scheduledTime || ''));
-    }, [state.tasks, today]);
+    }, [state.tasks, today, todayDate]);
 
     const todaysAgenda = useMemo(() => {
         const lessons = todaysLessons.map((lesson) => ({
@@ -355,11 +371,18 @@ const Dashboard: React.FC<Props> = ({ state, updateState, prayerTimes, setView }
   const saveTaskSchedule = () => {
     if (!schedulingTaskId || !scheduleDay || !scheduleTime) return;
     soundService.play('success');
+    const scheduledDate = getNextOccurrenceDate(scheduleDay);
     updateState({
       ...state,
       tasks: state.tasks.map(t =>
         t.id === schedulingTaskId
-          ? { ...t, scheduledDay: scheduleDay, scheduledTime: scheduleTime, scheduledDuration: scheduleDuration }
+          ? {
+              ...t,
+              scheduledDay: scheduleDay,
+              scheduledTime: scheduleTime,
+              scheduledDuration: scheduleDuration,
+              scheduledDate
+            }
           : t
       )
     });
@@ -372,7 +395,7 @@ const Dashboard: React.FC<Props> = ({ state, updateState, prayerTimes, setView }
       ...state,
       tasks: state.tasks.map(t =>
         t.id === id
-          ? { ...t, scheduledDay: undefined, scheduledTime: undefined, scheduledDuration: undefined }
+          ? { ...t, scheduledDay: undefined, scheduledTime: undefined, scheduledDuration: undefined, scheduledDate: undefined }
           : t
       )
     });
@@ -514,7 +537,7 @@ const Dashboard: React.FC<Props> = ({ state, updateState, prayerTimes, setView }
       <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-4">
         <div className="space-y-1">
            <h1 className="text-3xl md:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
-             {t('ahlan')}, <span className="text-indigo-600 dark:text-indigo-400">Younes</span>
+             {t('ahlan')}, <span className="text-indigo-600 dark:text-indigo-400">{auth.currentUser?.displayName || 'User'}</span>
            </h1>
            <div className="flex items-start gap-2 text-slate-500 dark:text-slate-400 font-medium text-xs md:text-sm animate-fade-in-up min-w-0">
                <Quote className="w-3 h-3 text-indigo-500 shrink-0" />

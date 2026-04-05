@@ -240,6 +240,20 @@ const App: React.FC = () => {
             pushNotify('Good Morning', `You have ${todayClasses} classes and ${activeTasks} tasks today. Bismillah!`, 'work', `morning-brief-${currentDateStr}`);
         }
 
+        const expiredSchedules = state.tasks.some(
+            t => t.scheduledDate && t.scheduledDate < currentDateStr
+        );
+        if (expiredSchedules) {
+            updateState(prev => ({
+                ...prev,
+                tasks: prev.tasks.map(t =>
+                    t.scheduledDate && t.scheduledDate < currentDateStr
+                        ? { ...t, scheduledDay: undefined, scheduledTime: undefined, scheduledDuration: undefined, scheduledDate: undefined }
+                        : t
+                )
+            }));
+        }
+
         state.lessons.filter(l => l.day === currentDay).forEach(lesson => {
             const [h, m] = lesson.time.split(':').map(Number);
             const lessonTimeVal = h * 60 + m;
@@ -251,7 +265,11 @@ const App: React.FC = () => {
         });
 
         state.tasks
-          .filter(task => !task.completed && task.scheduledDay === currentDay && task.scheduledTime)
+          .filter(task => {
+            if (task.completed || !task.scheduledTime) return false;
+            if (task.scheduledDate) return task.scheduledDate === currentDateStr;
+            return task.scheduledDay === currentDay;
+          })
           .forEach(task => {
             const [h, m] = task.scheduledTime!.split(':').map(Number);
             const taskTimeVal = h * 60 + m;
@@ -319,8 +337,12 @@ const App: React.FC = () => {
     return () => clearInterval(interval);
   }, [user, state.lessons, state.tasks, state.notifications, state.waterIntake, state.steps, state.sunnahs, prayerTimes]);
 
-  const updateState = (newState: AppState) => {
-    setState(normalizeAppState(newState));
+  const updateState = (newState: AppState | ((prev: AppState) => AppState)) => {
+    if (typeof newState === 'function') {
+      setState(prev => normalizeAppState(newState(prev)));
+    } else {
+      setState(normalizeAppState(newState));
+    }
   };
 
   const markNotificationsRead = (id?: string) => {
