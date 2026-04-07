@@ -36,10 +36,11 @@ export const showSystemNotification = async (notification: AppNotification) => {
     tag: `teacherlife-${notification.relatedId || notification.id}`,
     icon: '/icons/icon-192.svg',
     badge: '/icons/icon-badge.svg',
-    data: { url: '/' },
-    vibrate: [180, 80, 180],
-    renotify: false,
-    timestamp: new Date(notification.timestamp).getTime(),
+    data: {
+      url: notification.targetUrl || '/',
+      view: notification.targetView || 'dashboard',
+      notificationId: notification.id,
+    },
   };
 
   if ('serviceWorker' in navigator) {

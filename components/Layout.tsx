@@ -87,6 +87,30 @@ const Layout: React.FC<Props> = ({ currentView, setView, children, state, update
     });
   };
 
+  const ensureViewEnabled = (targetView: View) => {
+    if (state.featureToggles.views[targetView]) {
+      return;
+    }
+
+    updateState({
+      ...state,
+      featureToggles: {
+        ...state.featureToggles,
+        views: {
+          ...state.featureToggles.views,
+          [targetView]: true,
+        },
+      },
+    });
+  };
+
+  const updateNotificationPreferences = (updater: (current: AppState['notificationPreferences']) => AppState['notificationPreferences']) => {
+    updateState({
+      ...state,
+      notificationPreferences: updater(state.notificationPreferences),
+    });
+  };
+
   const openSettingsMenu = () => {
     setShowNotifications(false);
     setShowSettingsMenu(true);
@@ -146,6 +170,22 @@ const Layout: React.FC<Props> = ({ currentView, setView, children, state, update
   const handleNavClick = (view: View) => {
       setView(view);
       setIsSidebarOpen(false);
+  };
+
+  const openNotification = (notification: Notification) => {
+    markAsRead(notification.id);
+
+    const targetView = notification.targetView || 'dashboard';
+    ensureViewEnabled(targetView);
+    setView(targetView);
+
+    if (notification.targetUrl) {
+      window.history.replaceState({}, '', notification.targetUrl);
+    }
+
+    setShowNotifications(false);
+    setActiveToast(null);
+    setIsSidebarOpen(false);
   };
 
   const Logo = () => (
@@ -370,7 +410,12 @@ const Layout: React.FC<Props> = ({ currentView, setView, children, state, update
                                    </div>
                                ) : (
                                    notifications.map(n => (
-                                       <div key={n.id} className={getNotificationItemStyles(n)}>
+                                       <button
+                                           key={n.id}
+                                           type="button"
+                                           onClick={() => openNotification(n)}
+                                           className={`${getNotificationItemStyles(n)} w-full text-left`}
+                                       >
                                            <div className="flex justify-between items-start mb-1.5">
                                                <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-md ${getBadgeStyles(n.type)}`}>
                                                    {n.type}
@@ -380,11 +425,11 @@ const Layout: React.FC<Props> = ({ currentView, setView, children, state, update
                                            <h4 className={`text-sm font-bold mb-0.5 ${!n.read ? 'text-slate-900 dark:text-white' : 'text-slate-700 dark:text-slate-300'}`}>{n.title}</h4>
                                            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed line-clamp-2">{n.message}</p>
                                            {!n.read && (
-                                               <button onClick={() => markAsRead(n.id)} className="absolute right-4 bottom-4 text-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity" title="Mark read">
+                                               <span className="absolute right-4 bottom-4 text-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity" title="Unread">
                                                    <div className="w-2.5 h-2.5 rounded-full bg-indigo-500"></div>
-                                               </button>
+                                               </span>
                                            )}
-                                       </div>
+                                       </button>
                                    ))
                                )}
                            </div>
@@ -477,6 +522,57 @@ const Layout: React.FC<Props> = ({ currentView, setView, children, state, update
                              </div>
                            </div>
 
+                           <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3 md:p-4 dark:border-slate-800 dark:bg-slate-950/40">
+                             <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.22em] text-slate-400 dark:text-slate-500 mb-3">
+                               <Bell className="w-3 h-3" /> Notification Settings
+                             </div>
+
+                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
+                               <button
+                                 onClick={() => updateNotificationPreferences(current => ({ ...current, enabled: !current.enabled }))}
+                                 className={`rounded-xl border px-3 py-3 text-left transition-all ${state.notificationPreferences.enabled ? 'border-indigo-200 bg-white shadow-sm dark:border-indigo-900/40 dark:bg-slate-900/80' : 'border-slate-200 bg-white/70 dark:border-slate-700 dark:bg-slate-900/50 opacity-70'}`}
+                               >
+                                 <div className="text-xs font-bold text-slate-800 dark:text-slate-200">In-app notifications</div>
+                                 <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">Store alerts in the bell menu and show toast popups.</div>
+                               </button>
+
+                               <button
+                                 onClick={() => updateNotificationPreferences(current => ({ ...current, systemEnabled: !current.systemEnabled }))}
+                                 className={`rounded-xl border px-3 py-3 text-left transition-all ${state.notificationPreferences.systemEnabled ? 'border-indigo-200 bg-white shadow-sm dark:border-indigo-900/40 dark:bg-slate-900/80' : 'border-slate-200 bg-white/70 dark:border-slate-700 dark:bg-slate-900/50 opacity-70'}`}
+                               >
+                                 <div className="text-xs font-bold text-slate-800 dark:text-slate-200">System notifications</div>
+                                 <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">Show clickable browser notifications when the app is in the background.</div>
+                               </button>
+                             </div>
+
+                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                               {([
+                                 ['prayer', 'Prayer reminders'],
+                                 ['work', 'Work and classes'],
+                                 ['habit', 'Habits and health'],
+                                 ['general', 'General alerts'],
+                               ] as const).map(([type, label]) => {
+                                 const isEnabled = state.notificationPreferences.types[type];
+                                 return (
+                                   <button
+                                     key={type}
+                                     onClick={() => updateNotificationPreferences(current => ({
+                                       ...current,
+                                       types: {
+                                         ...current.types,
+                                         [type]: !current.types[type],
+                                       },
+                                     }))}
+                                     className={`rounded-xl border px-3 py-3 text-left transition-all ${isEnabled ? 'border-indigo-200 bg-white shadow-sm dark:border-indigo-900/40 dark:bg-slate-900/80' : 'border-slate-200 bg-white/70 dark:border-slate-700 dark:bg-slate-900/50 opacity-70'}`}
+                                   >
+                                     <div className="text-[11px] font-bold text-slate-800 dark:text-slate-200">{label}</div>
+                                     <div className={`mt-2 h-1.5 w-8 rounded-full ${isEnabled ? 'bg-indigo-500' : 'bg-slate-300 dark:bg-slate-700'}`}></div>
+                                   </button>
+                                 );
+                               })}
+                             </div>
+                           </div>
+
                            {/* Row 2: Feature toggles - compact grid */}
                            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3 md:p-4 dark:border-slate-800 dark:bg-slate-950/40">
                              <div className="flex items-center justify-between gap-2 mb-3">
@@ -563,10 +659,10 @@ const Layout: React.FC<Props> = ({ currentView, setView, children, state, update
                   <div className={`${getToastIconBg(activeToast.type)} p-2 rounded-full shrink-0`}>
                       {getToastIcon(activeToast.type)}
                   </div>
-                  <div className="flex-1">
+                  <button type="button" onClick={() => openNotification(activeToast)} className="flex-1 text-left">
                       <h4 className="font-bold text-sm mb-0.5 text-slate-900 dark:text-slate-100">{activeToast.title}</h4>
                       <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{activeToast.message}</p>
-                  </div>
+                  </button>
                   <button onClick={() => setActiveToast(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
                       <X className="w-4 h-4" />
                   </button>

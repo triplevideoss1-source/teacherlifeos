@@ -13,6 +13,8 @@ import Onboarding from './components/Onboarding';
 import ErrorBoundary from './components/ErrorBoundary';
 import { Loader2 } from 'lucide-react';
 
+const getNotificationUrl = (view: View, notificationId: string) => `/?view=${view}&notification=${notificationId}`;
+
 // Lazy Load Modules for Performance
 const Dashboard = React.lazy(() => import('./components/Dashboard'));
 const TeacherSchedule = React.lazy(() => import('./components/TeacherSchedule'));
@@ -123,6 +125,34 @@ const App: React.FC = () => {
     }
   }, [enabledViews, view]);
 
+  useEffect(() => {
+    const applyNotificationRoute = () => {
+      const url = new URL(window.location.href);
+      const requestedView = url.searchParams.get('view') as View | null;
+      const notificationId = url.searchParams.get('notification');
+
+      if (requestedView && APP_VIEWS.includes(requestedView) && enabledViews.includes(requestedView)) {
+        setView(requestedView);
+      }
+
+      if (notificationId) {
+        setState(prev => ({
+          ...prev,
+          notifications: prev.notifications.map(notification =>
+            notification.id === notificationId ? { ...notification, read: true } : notification
+          ),
+        }));
+      }
+    };
+
+    applyNotificationRoute();
+    window.addEventListener('popstate', applyNotificationRoute);
+
+    return () => {
+      window.removeEventListener('popstate', applyNotificationRoute);
+    };
+  }, [enabledViews]);
+
   // Fetch Prayer Times
   useEffect(() => {
     const fetchPrayers = async () => {
@@ -150,9 +180,11 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!user) return;
 
-    requestNotificationPermission().catch((error) => {
-      console.error('Notification permission request failed:', error);
-    });
+    if (state.notificationPreferences.enabled && state.notificationPreferences.systemEnabled) {
+      requestNotificationPermission().catch((error) => {
+        console.error('Notification permission request failed:', error);
+      });
+    }
 
     const checkReminders = () => {
         const now = new Date();
@@ -168,16 +200,29 @@ const App: React.FC = () => {
             return state.notifications.some(n => n.relatedId === relatedId);
         };
 
-        const pushNotify = (title: string, message: string, type: AppNotification['type'], uniqueId: string) => {
+        const pushNotify = (
+          title: string,
+          message: string,
+          type: AppNotification['type'],
+          uniqueId: string,
+          targetView: View = 'dashboard'
+        ) => {
+            if (!state.notificationPreferences.enabled || !state.notificationPreferences.types[type]) {
+                return;
+            }
+
             if (!alreadyNotified(uniqueId)) {
+                const notificationId = Date.now().toString() + Math.random();
                 newNotifications.push({
-                    id: Date.now().toString() + Math.random(),
+                    id: notificationId,
                     title,
                     message,
                     type,
                     timestamp: now.toISOString(),
                     read: false,
-                    relatedId: uniqueId
+                    relatedId: uniqueId,
+                    targetView,
+                    targetUrl: getNotificationUrl(targetView, notificationId),
                 });
             }
         };
@@ -206,12 +251,12 @@ const App: React.FC = () => {
                         const endTimeVal = lh * 60 + lm + event.duration;
                         
                         if (currentTimeVal === endTimeVal) {
-                            pushNotify('Missed Prayer', `Your ${event.studentName} session just ended. Don't forget to pray ${prayer} which was during your class.`, 'prayer', `missed-prayer-${prayer}-${currentDateStr}`);
+                            pushNotify('Missed Prayer', `Your ${event.studentName} session just ended. Don't forget to pray ${prayer} which was during your class.`, 'prayer', `missed-prayer-${prayer}-${currentDateStr}`, 'muslim');
                         }
                     } else {
                         // Normal notification logic
                         if (diff <= 15 && diff > 0) {
-                             pushNotify('Prayer Approaching', `${prayer} is in ${diff} minutes. Time to make wudu.`, 'prayer', `prayer-${prayer}-${currentDateStr}`);
+                             pushNotify('Prayer Approaching', `${prayer} is in ${diff} minutes. Time to make wudu.`, 'prayer', `prayer-${prayer}-${currentDateStr}`, 'muslim');
                         }
                     }
                 }
@@ -219,25 +264,25 @@ const App: React.FC = () => {
         }
 
         if (currentDay === 'Friday' && currentHours >= 10 && currentHours < 14) {
-             pushNotify('Jumu\'ah Mubarak', 'Don\'t forget to read Surah Al-Kahf today.', 'prayer', `kahf-${currentDateStr}`);
+             pushNotify('Jumu\'ah Mubarak', 'Don\'t forget to read Surah Al-Kahf today.', 'prayer', `kahf-${currentDateStr}`, 'muslim');
         }
 
         if ((currentDay === 'Sunday' || currentDay === 'Wednesday') && currentHours === 20) {
             const nextDay = currentDay === 'Sunday' ? 'Monday' : 'Thursday';
-            pushNotify('Sunnah Fasting', `Tomorrow is ${nextDay}. Intend to fast?`, 'prayer', `fast-remind-${currentDateStr}`);
+            pushNotify('Sunnah Fasting', `Tomorrow is ${nextDay}. Intend to fast?`, 'prayer', `fast-remind-${currentDateStr}`, 'muslim');
         }
 
         if (currentHours === 22) {
              const sunnahLog = state.sunnahs[currentDateStr];
              if (!sunnahLog || !sunnahLog.witr) {
-                 pushNotify('End Your Day', 'Have you prayed Witr yet?', 'prayer', `witr-${currentDateStr}`);
+                 pushNotify('End Your Day', 'Have you prayed Witr yet?', 'prayer', `witr-${currentDateStr}`, 'muslim');
              }
         }
 
         if (currentHours === 8 && currentMinutes < 30) {
             const todayClasses = state.lessons.filter(l => l.day === currentDay).length;
             const activeTasks = state.tasks.filter(t => !t.completed).length;
-            pushNotify('Good Morning', `You have ${todayClasses} classes and ${activeTasks} tasks today. Bismillah!`, 'work', `morning-brief-${currentDateStr}`);
+            pushNotify('Good Morning', `You have ${todayClasses} classes and ${activeTasks} tasks today. Bismillah!`, 'work', `morning-brief-${currentDateStr}`, 'dashboard');
         }
 
         const expiredSchedules = state.tasks.some(
@@ -260,7 +305,7 @@ const App: React.FC = () => {
             const diff = lessonTimeVal - currentTimeVal;
 
             if (diff <= 15 && diff > 0) {
-                pushNotify('Upcoming Class', `Class with ${lesson.studentName} starts in ${diff} mins.`, 'work', `lesson-${lesson.id}-${currentDateStr}`);
+                pushNotify('Upcoming Class', `Class with ${lesson.studentName} starts in ${diff} mins.`, 'work', `lesson-${lesson.id}-${currentDateStr}`, 'teacher');
             }
         });
 
@@ -276,43 +321,43 @@ const App: React.FC = () => {
             const diff = taskTimeVal - currentTimeVal;
 
             if (diff <= 15 && diff > 0) {
-              pushNotify('Planned Task', `${task.title} starts in ${diff} mins.`, 'work', `task-${task.id}-${currentDateStr}`);
+              pushNotify('Planned Task', `${task.title} starts in ${diff} mins.`, 'work', `task-${task.id}-${currentDateStr}`, 'dashboard');
             }
           });
 
         if (currentDay === 'Sunday' && currentHours === 19) {
-            pushNotify('Weekly Review', 'Take 10 mins to plan your classes for the upcoming week.', 'work', `weekly-plan-${currentDateStr}`);
+            pushNotify('Weekly Review', 'Take 10 mins to plan your classes for the upcoming week.', 'work', `weekly-plan-${currentDateStr}`, 'teacher');
         }
 
         if (currentHours === 14) {
             const water = state.waterIntake[currentDateStr] || 0;
             if (water < 4) {
-                pushNotify('Hydration Alert', 'You haven\'t drunk much water today. Grab a glass!', 'habit', `water-check-1-${currentDateStr}`);
+                pushNotify('Hydration Alert', 'You haven\'t drunk much water today. Grab a glass!', 'habit', `water-check-1-${currentDateStr}`, 'lifestyle');
             }
         }
         
         if (currentHours === 19) {
             const water = state.waterIntake[currentDateStr] || 0;
             if (water < 6) {
-                pushNotify('Hydration Check', 'Try to hit your water goal before bed.', 'habit', `water-check-2-${currentDateStr}`);
+                pushNotify('Hydration Check', 'Try to hit your water goal before bed.', 'habit', `water-check-2-${currentDateStr}`, 'lifestyle');
             }
         }
 
         if (currentHours === 18) {
             const steps = state.steps[currentDateStr] || 0;
             if (steps < 3000) {
-                pushNotify('Get Moving', 'Your step count is low today. Go for a short walk?', 'habit', `steps-check-${currentDateStr}`);
+                pushNotify('Get Moving', 'Your step count is low today. Go for a short walk?', 'habit', `steps-check-${currentDateStr}`, 'lifestyle');
             }
         }
 
         if (currentHours === 23) {
-            pushNotify('Sleep Routine', 'Time to wind down. Recite Surah Mulk and 3 Quls.', 'habit', `sleep-${currentDateStr}`);
+            pushNotify('Sleep Routine', 'Time to wind down. Recite Surah Mulk and 3 Quls.', 'habit', `sleep-${currentDateStr}`, 'lifestyle');
         }
         
         if (currentHours === 21) {
              const highPriorityPending = state.tasks.filter(t => !t.completed && t.priority === 'high').length;
              if (highPriorityPending > 0) {
-                 pushNotify('Pending Tasks', `You have ${highPriorityPending} high priority tasks left. Reschedule or do them now?`, 'work', `tasks-pending-${currentDateStr}`);
+                 pushNotify('Pending Tasks', `You have ${highPriorityPending} high priority tasks left. Reschedule or do them now?`, 'work', `tasks-pending-${currentDateStr}`, 'dashboard');
              }
         }
 
@@ -322,7 +367,7 @@ const App: React.FC = () => {
                 ...prev,
                 notifications: [ ...newNotifications, ...prev.notifications ]
             }));
-          if (document.hidden || !document.hasFocus()) {
+          if (state.notificationPreferences.systemEnabled && (document.hidden || !document.hasFocus())) {
             newNotifications.forEach((notification) => {
               showSystemNotification(notification).catch((error) => {
                 console.error('System notification failed:', error);
@@ -335,7 +380,7 @@ const App: React.FC = () => {
       checkReminders();
     const interval = setInterval(checkReminders, 60000);
     return () => clearInterval(interval);
-  }, [user, state.lessons, state.tasks, state.notifications, state.waterIntake, state.steps, state.sunnahs, prayerTimes]);
+  }, [user, state.lessons, state.tasks, state.notifications, state.waterIntake, state.steps, state.sunnahs, prayerTimes, state.notificationPreferences]);
 
   const updateState = (newState: AppState | ((prev: AppState) => AppState)) => {
     if (typeof newState === 'function') {

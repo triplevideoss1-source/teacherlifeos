@@ -2,6 +2,7 @@
 export type View = 'dashboard' | 'teacher' | 'muslim' | 'lifestyle' | 'finance' | 'meals';
 export type Theme = 'light' | 'dark';
 export type Language = 'en' | 'fr' | 'ar';
+export type NotificationType = 'prayer' | 'work' | 'habit' | 'general';
 
 export const APP_VIEWS: View[] = ['dashboard', 'teacher', 'muslim', 'lifestyle', 'finance', 'meals'];
 
@@ -121,10 +122,18 @@ export interface Notification {
   id: string;
   title: string;
   message: string;
-  type: 'prayer' | 'work' | 'habit' | 'general';
+  type: NotificationType;
   timestamp: string;
   read: boolean;
   relatedId?: string; // To prevent duplicate reminders for the same event
+  targetView?: View;
+  targetUrl?: string;
+}
+
+export interface NotificationPreferences {
+  enabled: boolean;
+  systemEnabled: boolean;
+  types: Record<NotificationType, boolean>;
 }
 
 export interface ReadingBook {
@@ -237,6 +246,7 @@ export interface AppState {
   financeCategories?: string[];
   budgets?: Budget[];
   fixedItems?: FixedItem[];
+  notificationPreferences: NotificationPreferences;
   language: Language;
   onboardingCompleted: boolean;
 }

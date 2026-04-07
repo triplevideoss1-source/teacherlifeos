@@ -98,6 +98,17 @@ const DEFAULT_FEATURE_TOGGLES: AppState['featureToggles'] = {
   },
 };
 
+const DEFAULT_NOTIFICATION_PREFERENCES: AppState['notificationPreferences'] = {
+  enabled: true,
+  systemEnabled: true,
+  types: {
+    prayer: true,
+    work: true,
+    habit: true,
+    general: true,
+  },
+};
+
 export const normalizeAppState = (loaded?: Partial<AppState> | null): AppState => {
   const { updatedAt: _updatedAt, ...safeLoaded } = (loaded || {}) as Partial<AppState> & { updatedAt?: unknown };
   const meals = Object.fromEntries(
@@ -111,10 +122,20 @@ export const normalizeAppState = (loaded?: Partial<AppState> | null): AppState =
     },
   };
 
+  const notificationPreferences: AppState['notificationPreferences'] = {
+    enabled: safeLoaded.notificationPreferences?.enabled ?? DEFAULT_NOTIFICATION_PREFERENCES.enabled,
+    systemEnabled: safeLoaded.notificationPreferences?.systemEnabled ?? DEFAULT_NOTIFICATION_PREFERENCES.systemEnabled,
+    types: {
+      ...DEFAULT_NOTIFICATION_PREFERENCES.types,
+      ...(safeLoaded.notificationPreferences?.types || {}),
+    },
+  };
+
   return {
     ...defaultState,
     ...safeLoaded,
     featureToggles,
+    notificationPreferences,
     meals,
     notifications: safeLoaded.notifications || [],
     tasks: safeLoaded.tasks || [],
@@ -188,6 +209,7 @@ export const defaultState: AppState = {
   financeCategories: ['Food', 'Transport', 'Bills', 'Shopping', 'Health', 'Education', 'Subscriptions', 'Other'],
   budgets: [],
   fixedItems: [],
+  notificationPreferences: DEFAULT_NOTIFICATION_PREFERENCES,
   language: 'en',
   onboardingCompleted: false
 };
