@@ -126,8 +126,8 @@ const MuslimModule: React.FC<Props> = ({ state, updateState, prayerTimes }) => {
         return Object.entries(grouped)
             .map(([category, duas]) => ({
                 category,
-                duas: duas.slice(0, 3),
-                total: duas.length,
+                duas: (duas as Dua[]).slice(0, 3),
+                total: (duas as Dua[]).length,
             }))
             .sort((left, right) => left.category.localeCompare(right.category));
     }, [state.duas]);
@@ -760,7 +760,7 @@ const MuslimModule: React.FC<Props> = ({ state, updateState, prayerTimes }) => {
                                 <input 
                                     value={duaTopic}
                                     onChange={e => setDuaTopic(e.target.value)}
-                                    placeholder={t('egPatienceExams')} 
+                                    placeholder={t('egDuaTopic')} 
                                     className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 rounded-2xl text-sm bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all"
                                 />
                                 <button 
