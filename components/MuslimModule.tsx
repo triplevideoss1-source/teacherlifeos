@@ -89,7 +89,7 @@ const MuslimModule: React.FC<Props> = ({ state, updateState, prayerTimes }) => {
   const sunnahData = state.sunnahs[todayDate] || { fajr: false, dhuhr: false, asr: false, maghrib: false, isha: false, witr: false };
   const adhkarData = state.adhkarLog[todayDate] || { morning: false, evening: false, sleep: false };
   
-  const totalSunnahs = 5; 
+  const totalSunnahs = 6; 
   const completedSunnahs = Object.values(sunnahData).filter(Boolean).length;
   
   const totalAdhkar = 3; 

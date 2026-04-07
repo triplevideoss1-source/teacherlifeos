@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { AppState } from '../types';
 import { useTranslation } from '../lib/translations';
 import { suggestMealPlan } from '../services/gemini';
+import { soundService } from '../services/sounds';
 import { Utensils, Sparkles, Loader2 } from 'lucide-react';
 
 interface Props {
@@ -35,9 +36,8 @@ const MealPlanner: React.FC<Props> = ({ state, updateState }) => {
   const generatePlan = async () => {
      if (!preferences) return;
      setLoading(true);
-     // Note: This is a simple implementation. Ideally we parse JSON from Gemini.
      const suggestion = await suggestMealPlan(preferences);
-     // For now, we'll just put the suggestion in Monday as a demo, or alert it
+     soundService.play('success');
      alert("AI Suggestion:\n" + suggestion);
      setLoading(false);
   };

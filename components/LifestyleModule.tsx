@@ -20,6 +20,11 @@ const LifestyleModule: React.FC<Props> = ({ state, updateState }) => {
   // Steps State
   const [stepsInput, setStepsInput] = useState(state.steps[today] || 0);
   
+  // Keep stepsInput in sync with external state changes
+  React.useEffect(() => {
+    setStepsInput(state.steps[today] || 0);
+  }, [state.steps[today]]);
+  
   // Bad Habit State
   const [newBadHabit, setNewBadHabit] = useState('');
 

@@ -2,8 +2,9 @@ import { GoogleGenAI } from "@google/genai";
 
 const getClient = () => {
     // Only initialize if API key exists.
-    if (!process.env.API_KEY) return null;
-    return new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    if (!apiKey) return null;
+    return new GoogleGenAI({ apiKey });
 }
 
 export const processBrainDump = async (text: string): Promise<string> => {

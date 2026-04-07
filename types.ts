@@ -181,6 +181,7 @@ export interface FocusSession {
   mode: 'focus' | 'dhikr' | 'break';
   timeLeft: number; // seconds
   startTime: number | null;
+  endTime?: number | null;
 }
 
 export interface AppState {

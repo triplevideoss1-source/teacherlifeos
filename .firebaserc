@@ -1,0 +1,12 @@
+{
+  "projects": {
+    "default": "youness-classroom-tools"
+  },
+  "targets": {
+    "youness-classroom-tools": {
+      "hosting": {
+        "teacher-life-os": ["teacher-life-os"]
+      }
+    }
+  }
+}

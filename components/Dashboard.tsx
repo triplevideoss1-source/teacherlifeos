@@ -128,6 +128,10 @@ const ISLAMIC_DAILY = [
 ];
 
 const WEEK_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const FOCUS_DURATIONS = {
+  focus: 25 * 60,
+  dhikr: 5 * 60,
+} as const;
 const toLocalISODate = (date: Date) => date.toLocaleDateString('en-CA');
 const getNextOccurrenceDate = (weekday: string) => {
   const targetIndex = WEEK_DAYS.indexOf(weekday);
@@ -181,25 +185,64 @@ const Dashboard: React.FC<Props> = ({ state, updateState, prayerTimes, setView }
       }
   }, []);
 
-  // Timer Logic — uses functional updater to avoid stale closures
+  const syncFocusSession = useCallback(() => {
+    updateState((prev: AppState) => {
+      const session = prev.focusSession;
+
+      if (!session?.isActive || !session.endTime) {
+        return prev;
+      }
+
+      const nextTimeLeft = Math.max(0, Math.ceil((session.endTime - Date.now()) / 1000));
+
+      if (nextTimeLeft === session.timeLeft) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        focusSession: {
+          ...session,
+          timeLeft: nextTimeLeft,
+          isActive: nextTimeLeft > 0,
+          endTime: nextTimeLeft > 0 ? session.endTime : null,
+        }
+      };
+    });
+  }, [updateState]);
+
+  // Timer Logic - derives remaining time from an absolute end time so it survives tab throttling.
   useEffect(() => {
     if (state.focusSession?.isActive) {
-        timerRef.current = window.setInterval(() => {
-            updateState((prev: AppState) => ({
-                ...prev,
-                focusSession: {
-                    ...prev.focusSession!,
-                    timeLeft: Math.max(0, prev.focusSession!.timeLeft - 1)
-                }
-            }) as AppState);
-        }, 1000);
+        syncFocusSession();
+        timerRef.current = window.setInterval(syncFocusSession, 1000);
     } else if (timerRef.current) {
         clearInterval(timerRef.current);
+        timerRef.current = null;
     }
     return () => {
-        if(timerRef.current) clearInterval(timerRef.current);
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
     };
-  }, [state.focusSession?.isActive]);
+  }, [state.focusSession?.isActive, syncFocusSession]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        syncFocusSession();
+      }
+    };
+
+    window.addEventListener('focus', syncFocusSession);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('focus', syncFocusSession);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [syncFocusSession]);
 
 
   const todaysLessons = useMemo(() => state.lessons.filter(l => l.day === today).sort((a,b) => a.time.localeCompare(b.time)), [state.lessons, today]);
@@ -406,15 +449,29 @@ const Dashboard: React.FC<Props> = ({ state, updateState, prayerTimes, setView }
   const toggleTimer = () => {
       soundService.play('switch');
       if (!state.focusSession) {
+          const duration = FOCUS_DURATIONS.focus;
+          const now = Date.now();
           // Init
           updateState({
               ...state,
-              focusSession: { isActive: true, mode: 'focus', timeLeft: 25 * 60, startTime: Date.now() }
+              focusSession: { isActive: true, mode: 'focus', timeLeft: duration, startTime: now, endTime: now + (duration * 1000) }
           });
       } else {
+          const now = Date.now();
+          const nextIsActive = !state.focusSession.isActive;
+          const nextTimeLeft = state.focusSession.isActive && state.focusSession.endTime
+            ? Math.max(0, Math.ceil((state.focusSession.endTime - now) / 1000))
+            : state.focusSession.timeLeft;
+
           updateState({
               ...state,
-              focusSession: { ...state.focusSession, isActive: !state.focusSession.isActive }
+              focusSession: {
+                  ...state.focusSession,
+                  isActive: nextIsActive,
+                  timeLeft: nextTimeLeft,
+                  startTime: nextIsActive ? now : state.focusSession.startTime,
+                  endTime: nextIsActive ? now + (nextTimeLeft * 1000) : null
+              }
           });
       }
   };
@@ -434,8 +491,9 @@ const Dashboard: React.FC<Props> = ({ state, updateState, prayerTimes, setView }
           focusSession: {
               isActive: false,
               mode: mode,
-              timeLeft: mode === 'focus' ? 25 * 60 : 5 * 60,
-              startTime: null
+              timeLeft: FOCUS_DURATIONS[mode],
+              startTime: null,
+              endTime: null
           }
       });
   };
