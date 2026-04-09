@@ -16,7 +16,7 @@
     },
     "AppState": {
       "title": "App State",
-       "description": "The complete state of the user's Younesslifehub application",
+       "description": "The complete state of the user's TeacherLife Hub application",
       "type": "object",
       "properties": {
         "theme": { "type": "string", "enum": ["light", "dark"] },
