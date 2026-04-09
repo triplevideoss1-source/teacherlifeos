@@ -420,7 +420,7 @@ const App: React.FC = () => {
       case 'dashboard':
         return <Dashboard state={state} updateState={updateState} prayerTimes={prayerTimes} setView={setView} />;
       case 'teacher':
-        return <TeacherSchedule state={state} updateState={updateState} prayerTimes={prayerTimes} />;
+        return <TeacherSchedule state={state} updateState={updateState} />;
       case 'muslim':
         return <MuslimModule state={state} updateState={updateState} prayerTimes={prayerTimes} />;
       case 'lifestyle':
