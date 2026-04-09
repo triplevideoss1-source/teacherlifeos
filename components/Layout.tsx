@@ -192,11 +192,11 @@ const Layout: React.FC<Props> = ({ currentView, setView, children, state, update
       <div className="flex items-center gap-3">
           <img 
             src="https://res.cloudinary.com/dy1zfsiwp/image/upload/v1765454170/Logo_am1fwm.png" 
-            alt="TeacherLife Hub Logo" 
+            alt="Younesslifehub Logo" 
             className="h-8 w-auto object-contain"
           />
           <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-slate-800 to-slate-600 dark:from-white dark:to-slate-400">
-            TeacherLife Hub
+            Younesslifehub
           </span>
       </div>
   );

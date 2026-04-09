@@ -119,11 +119,11 @@ const Auth: React.FC = () => {
         >
           <img
             src="/icons/icon-192.svg"
-            alt="TeacherLife Hub logo"
+            alt="Younesslifehub logo"
             className="w-28 h-28 mx-auto mb-8 drop-shadow-2xl"
           />
           <h1 className="text-4xl font-bold text-white tracking-tight mb-4">
-            TeacherLife Hub
+            Younesslifehub
           </h1>
           <p className="text-indigo-200 text-lg leading-relaxed max-w-sm mx-auto">
             Your all-in-one dashboard for planning, wellbeing, and professional growth.
@@ -157,7 +157,7 @@ const Auth: React.FC = () => {
           <div className="bg-white/5 border border-white/10 backdrop-blur-xl rounded-3xl p-8 shadow-2xl">
             {/* Logo – shown on mobile only */}
             <div className="flex lg:hidden justify-center mb-6">
-              <img src="/icons/icon-192.svg" alt="TeacherLife Hub" className="w-16 h-16" />
+               <img src="/icons/icon-192.svg" alt="Younesslifehub" className="w-16 h-16" />
             </div>
 
             {/* Header */}
@@ -168,7 +168,7 @@ const Auth: React.FC = () => {
                 {mode === 'forgot-password' && 'Reset your password'}
               </h2>
               <p className="text-slate-400 text-sm mt-1">
-                {mode === 'login' && 'Sign in to your TeacherLife Hub account'}
+                 {mode === 'login' && 'Sign in to your Younesslifehub account'}
                 {mode === 'signup' && 'Get started — it only takes a minute'}
                 {mode === 'forgot-password' && "We'll send a reset link to your email"}
               </p>
