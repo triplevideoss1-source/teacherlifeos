@@ -27,6 +27,28 @@ const storeQuotaPause = () => {
 
 let firestoreSyncPaused = FIRESTORE_DEV_PAUSE || getStoredQuotaPause();
 
+const removeUndefinedFields = (value: unknown): unknown => {
+  if (Array.isArray(value)) {
+    return value
+      .filter((item) => item !== undefined)
+      .map((item) => removeUndefinedFields(item));
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).flatMap(([key, nestedValue]) => {
+        if (nestedValue === undefined) {
+          return [];
+        }
+
+        return [[key, removeUndefinedFields(nestedValue)]];
+      }),
+    );
+  }
+
+  return value;
+};
+
 const isQuotaExceededError = (error: unknown) => {
   return typeof error === 'object'
     && error !== null
@@ -49,8 +71,10 @@ export const saveAppStateToFirestore = async (userId: string, state: AppState) =
 
   try {
     const docRef = doc(db, APP_STATE_PATH(userId));
+    const sanitizedState = removeUndefinedFields(state) as AppState;
+
     await setDoc(docRef, {
-      ...state,
+      ...sanitizedState,
       updatedAt: serverTimestamp(),
     }, { merge: true });
   } catch (error) {
