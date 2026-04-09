@@ -38,17 +38,8 @@ type ScheduledItem = {
   priority?: Task['priority'];
 };
 
-type PositionedScheduledItem = ScheduledItem & {
-  start: number;
-  end: number;
-  columnIndex: number;
-  columnCount: number;
-};
-
 const TABLE_TIME_COLUMN_WIDTH = 70;
 const TABLE_SLOT_HEIGHT = 72;
-const SCHEDULE_CARD_GAP = 6;
-const MIN_EVENT_HEIGHT = 56;
 const toLocalDate = (dateStr: string) => {
   const [year, month, day] = dateStr.split('-').map(Number);
   return new Date(year, month - 1, day);
@@ -65,57 +56,6 @@ const timeToMinutes = (time: string) => {
   return (hours * 60) + minutes;
 };
 
-const layoutOverlappingItems = (items: ScheduledItem[]): PositionedScheduledItem[] => {
-  const sorted = [...items]
-    .map((item) => {
-      const start = timeToMinutes(item.time);
-      const end = start + Math.max(item.duration, 15);
-      return { ...item, start, end };
-    })
-    .sort((left, right) => left.start - right.start || left.end - right.end);
-
-  const positioned: PositionedScheduledItem[] = [];
-  let cluster: PositionedScheduledItem[] = [];
-  let active: PositionedScheduledItem[] = [];
-  let clusterMaxColumns = 0;
-
-  const finalizeCluster = () => {
-    if (cluster.length === 0) return;
-    positioned.push(...cluster.map((item) => ({ ...item, columnCount: clusterMaxColumns || 1 })));
-    cluster = [];
-    active = [];
-    clusterMaxColumns = 0;
-  };
-
-  for (const item of sorted) {
-    active = active.filter((entry) => entry.end > item.start);
-
-    if (active.length === 0) {
-      finalizeCluster();
-    }
-
-    const usedColumns = new Set(active.map((entry) => entry.columnIndex));
-    let columnIndex = 0;
-    while (usedColumns.has(columnIndex)) {
-      columnIndex += 1;
-    }
-
-    const positionedItem: PositionedScheduledItem = {
-      ...item,
-      columnIndex,
-      columnCount: 1,
-    };
-
-    active.push(positionedItem);
-    cluster.push(positionedItem);
-    clusterMaxColumns = Math.max(clusterMaxColumns, active.length);
-  }
-
-  finalizeCluster();
-
-  return positioned;
-};
-
 const TeacherSchedule: React.FC<Props> = ({ state, updateState }) => {
   const { t } = useTranslation(state.language);
   const [showSettings, setShowSettings] = useState(false);
@@ -124,7 +64,6 @@ const TeacherSchedule: React.FC<Props> = ({ state, updateState }) => {
     const [showTableOverlay, setShowTableOverlay] = useState(false);
   const [placingTemplate, setPlacingTemplate] = useState<ClassTemplate | null>(null);
   const [movingLessonId, setMovingLessonId] = useState<string | null>(null);
-  const [selectedItem, setSelectedItem] = useState<ScheduledItem | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Template State
@@ -383,22 +322,14 @@ const TeacherSchedule: React.FC<Props> = ({ state, updateState }) => {
       updateState({...state, classTemplates: state.classTemplates.filter(t => t.id !== id)});
   };
 
-  const editSelectedLesson = () => {
-      if (!selectedItem || selectedItem.type !== 'lesson') return;
-      const lesson = state.lessons.find((entry) => entry.id === selectedItem.id);
-      if (!lesson) return;
-      setSelectedItem(null);
-      setEditingLesson(lesson);
-  };
-
   const renderScheduleTable = (wrapperClassName: string) => {
       const startMinutes = settings.startHour * 60;
       const totalMinutes = Math.max((settings.endHour - settings.startHour) * 60, settings.interval);
       const totalHeight = timeSlots.length * TABLE_SLOT_HEIGHT;
-      const itemsByDay = settings.daysToShow.reduce((acc: Record<string, PositionedScheduledItem[]>, day) => {
-          acc[day] = layoutOverlappingItems(scheduledItems.filter((item) => item.day === day));
+      const itemsByDay = settings.daysToShow.reduce((acc: Record<string, ScheduledItem[]>, day) => {
+          acc[day] = scheduledItems.filter((item) => item.day === day);
           return acc;
-      }, {} as Record<string, PositionedScheduledItem[]>);
+      }, {});
 
       return (
           <div className={wrapperClassName}>
@@ -468,15 +399,10 @@ const TeacherSchedule: React.FC<Props> = ({ state, updateState }) => {
                                 }}
                             >
                                 {itemsByDay[day].map(item => {
-                                    const itemStart = item.start;
-                                    const itemEnd = item.end;
+                                    const itemStart = timeToMinutes(item.time);
+                                    const itemEnd = itemStart + Math.max(item.duration, 15);
                                     const top = Math.max(0, ((itemStart - startMinutes) / totalMinutes) * totalHeight);
-                                    const height = Math.max(MIN_EVENT_HEIGHT, ((Math.min(itemEnd, startMinutes + totalMinutes) - Math.max(itemStart, startMinutes)) / totalMinutes) * totalHeight);
-                                    const baseWidth = 100 / item.columnCount;
-                                    const left = `calc(${(baseWidth * item.columnIndex).toFixed(4)}% + ${item.columnIndex * SCHEDULE_CARD_GAP}px)`;
-                                    const width = `calc(${baseWidth.toFixed(4)}% - ${SCHEDULE_CARD_GAP}px)`;
-                                    const isCompact = height < 88;
-                                    const isTiny = height < 72;
+                                    const height = Math.max(44, ((Math.min(itemEnd, startMinutes + totalMinutes) - Math.max(itemStart, startMinutes)) / totalMinutes) * totalHeight);
 
                                     if (itemEnd <= startMinutes || itemStart >= startMinutes + totalMinutes) {
                                         return null;
@@ -489,60 +415,42 @@ const TeacherSchedule: React.FC<Props> = ({ state, updateState }) => {
                                             onDragStart={item.type === 'lesson' ? (e) => handleDragStart(e, 'lesson', item.id) : undefined}
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                setSelectedItem(item);
+                                                if (item.type === 'lesson') {
+                                                    const lesson = state.lessons.find((entry) => entry.id === item.id);
+                                                    if (lesson) setEditingLesson(lesson);
+                                                }
                                             }}
-                                            className={`absolute rounded-[1.35rem] text-left text-white shadow-lg overflow-hidden hover:brightness-[1.03] hover:scale-[1.01] transition-all flex flex-col print:shadow-none print:border print:border-slate-200 pointer-events-auto ring-1 ring-white/15 ${item.type === 'lesson' ? 'cursor-move' : 'cursor-pointer'} ${isTiny ? 'justify-center' : ''}`}
+                                            className={`absolute left-0 right-0 mx-1 p-3 rounded-2xl text-left text-white shadow-lg overflow-hidden hover:brightness-95 hover:scale-[1.01] transition-all flex flex-col print:shadow-none print:border print:border-slate-200 pointer-events-auto ${item.type === 'lesson' ? 'cursor-move' : 'cursor-default'}`}
                                             style={{
                                                 top,
                                                 height,
-                                                left,
-                                                width,
-                                                background: `linear-gradient(180deg, ${item.color} 0%, ${item.color}dd 100%)`,
-                                                boxShadow: `0 10px 24px -10px ${item.color}cc`,
+                                                backgroundColor: item.color,
+                                                boxShadow: `0 4px 12px -2px ${item.color}40`,
                                             }}
                                             title={item.type === 'task' ? `${item.title} (${item.time})` : item.title}
                                         >
-                                            <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.14),rgba(255,255,255,0.02))] pointer-events-none" />
-                                            <div className={`relative h-full ${isCompact ? 'p-2.5' : 'p-3.5'} flex flex-col`}>
-                                                <div className={`flex items-start justify-between gap-2 ${isCompact ? 'mb-1' : 'mb-1.5'}`}>
-                                                    <div className="min-w-0 flex-1">
-                                                        <div className={`font-black leading-tight break-words ${isCompact ? 'text-[11px] line-clamp-2' : 'text-[13px] line-clamp-3'}`}>{item.title}</div>
-                                                        {!isTiny && (
-                                                            <div className={`mt-1 break-words text-white/85 font-semibold ${isCompact ? 'text-[9px] line-clamp-1' : 'text-[10px] line-clamp-2'}`}>
-                                                                {item.subtitle || (item.type === 'task' ? t('todo') : t('classes'))}
-                                                            </div>
-                                                        )}
+                                            <div className="flex justify-between items-start mb-1 gap-2">
+                                                <span className="font-bold leading-tight line-clamp-2 break-words">{item.title}</span>
+                                                {item.type === 'task' ? (
+                                                    <div
+                                                        className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white/25 text-white/90 shadow-sm"
+                                                        title={t('todo')}
+                                                    >
+                                                        <ListChecks className="w-3 h-3" />
                                                     </div>
-                                                    {item.type === 'task' ? (
-                                                        <div
-                                                            className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/20 text-white/90 shadow-sm shrink-0"
-                                                            title={t('todo')}
-                                                        >
-                                                            <ListChecks className="w-3 h-3" />
-                                                        </div>
-                                                    ) : item.isFixed ? (
-                                                        <div
-                                                            className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white/20 text-white/90 shadow-sm shrink-0"
-                                                            title={t('fixedEvent')}
-                                                        >
-                                                            <Pin className="w-3 h-3" />
-                                                        </div>
-                                                    ) : null}
-                                                </div>
-                                                <div className={`mt-auto flex flex-wrap items-center gap-1.5 text-white/90 font-black uppercase tracking-[0.16em] ${isCompact ? 'text-[8px]' : 'text-[9px]'}`}>
-                                                    <span className="inline-flex items-center gap-1 rounded-full bg-black/15 px-2 py-1">
-                                                        <Clock className="w-2.5 h-2.5 shrink-0" />
-                                                        <span>{item.time}</span>
-                                                    </span>
-                                                    <span className="inline-flex items-center rounded-full bg-black/15 px-2 py-1">
-                                                        {item.duration}m
-                                                    </span>
-                                                    {!isTiny && item.location && (
-                                                        <span className="inline-flex min-w-0 items-center gap-1 rounded-full bg-black/15 px-2 py-1">
-                                                            <MapPin className="w-2.5 h-2.5 shrink-0" />
-                                                            <span className="truncate">{item.location}</span>
-                                                        </span>
-                                                    )}
+                                                ) : item.isFixed ? (
+                                                    <div
+                                                        className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white/25 text-white/90 shadow-sm"
+                                                        title={t('fixedEvent')}
+                                                    >
+                                                        <Pin className="w-3 h-3" />
+                                                    </div>
+                                                ) : null}
+                                            </div>
+                                            <div className="flex flex-col h-full">
+                                                <div className="line-clamp-2 break-words opacity-90 font-medium mb-1">{item.subtitle || (item.type === 'task' ? t('todo') : t('classes'))}</div>
+                                                <div className="mt-auto flex items-center gap-1.5 opacity-80 font-bold text-[9px] uppercase tracking-wider">
+                                                    {item.location ? <><MapPin className="w-2.5 h-2.5 shrink-0" /> <span className="truncate">{item.location}</span></> : <><Clock className="w-2.5 h-2.5 shrink-0" /> {item.duration}m</>}
                                                 </div>
                                             </div>
                                         </button>
@@ -767,7 +675,10 @@ const TeacherSchedule: React.FC<Props> = ({ state, updateState }) => {
                                                     {/* Event card */}
                                                     <button
                                                         onClick={() => {
-                                                            setSelectedItem(item);
+                                                            if (item.type === 'lesson') {
+                                                                const lesson = state.lessons.find((entry) => entry.id === item.id);
+                                                                if (lesson) setEditingLesson(lesson);
+                                                            }
                                                         }}
                                                         className="w-full text-left ml-4 p-3.5 rounded-2xl border transition-all hover:shadow-md active:scale-[0.98]"
                                                         style={{ borderLeft: `4px solid ${item.color}`, borderColor: `${item.color}30`, backgroundColor: `${item.color}08` }}
@@ -832,71 +743,6 @@ const TeacherSchedule: React.FC<Props> = ({ state, updateState }) => {
               </div>
               <div className="flex-1 overflow-hidden p-4">
                   {renderScheduleTable('h-full overflow-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-sm custom-scrollbar')}
-              </div>
-          </div>
-      )}
-
-      {selectedItem && (
-          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 print:hidden backdrop-blur-sm">
-              <div className="w-full max-w-md rounded-[2rem] border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xl overflow-hidden">
-                  <div className="p-5 border-b border-slate-100 dark:border-slate-800" style={{ background: `linear-gradient(135deg, ${selectedItem.color}18, transparent)` }}>
-                      <div className="flex items-start justify-between gap-4">
-                          <div className="min-w-0">
-                              <div className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 dark:text-slate-500">
-                                  {selectedItem.type === 'task' ? t('todo') : t('classes')}
-                              </div>
-                              <h3 className="mt-2 text-xl font-black text-slate-900 dark:text-slate-100 break-words">{selectedItem.title}</h3>
-                              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{selectedItem.subtitle}</p>
-                          </div>
-                          <button onClick={() => setSelectedItem(null)} className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
-                              <X className="w-4 h-4" />
-                          </button>
-                      </div>
-                  </div>
-                  <div className="p-5 space-y-3">
-                      <div className="flex items-center justify-between rounded-2xl bg-slate-50 dark:bg-slate-800/60 px-4 py-3">
-                          <span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">{t('time')}</span>
-                          <span className="text-sm font-bold text-slate-800 dark:text-slate-100">{selectedItem.day} · {selectedItem.time}</span>
-                      </div>
-                      <div className="flex items-center justify-between rounded-2xl bg-slate-50 dark:bg-slate-800/60 px-4 py-3">
-                          <span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">{t('duration')}</span>
-                          <span className="text-sm font-bold text-slate-800 dark:text-slate-100">{selectedItem.duration} {t('minutes')}</span>
-                      </div>
-                      {selectedItem.location && (
-                          <div className="flex items-center justify-between rounded-2xl bg-slate-50 dark:bg-slate-800/60 px-4 py-3">
-                              <span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">{t('location')}</span>
-                              <span className="text-sm font-bold text-slate-800 dark:text-slate-100 text-right">{selectedItem.location}</span>
-                          </div>
-                      )}
-                      {selectedItem.notes && (
-                          <div className="rounded-2xl bg-slate-50 dark:bg-slate-800/60 px-4 py-3">
-                              <div className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500 mb-2">Notes</div>
-                              <div className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{selectedItem.notes}</div>
-                          </div>
-                      )}
-                      {selectedItem.type === 'task' && selectedItem.priority && (
-                          <div className="flex items-center justify-between rounded-2xl bg-slate-50 dark:bg-slate-800/60 px-4 py-3">
-                              <span className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">{t('priority')}</span>
-                              <span className="text-sm font-bold text-slate-800 dark:text-slate-100 capitalize">{selectedItem.priority}</span>
-                          </div>
-                      )}
-                  </div>
-                  <div className="p-5 pt-0 flex items-center justify-end gap-2">
-                      {selectedItem.type === 'lesson' && (
-                          <button
-                              onClick={editSelectedLesson}
-                              className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-indigo-600/20"
-                          >
-                              {t('edit')}
-                          </button>
-                      )}
-                      <button
-                          onClick={() => setSelectedItem(null)}
-                          className="rounded-xl border border-slate-200 dark:border-slate-700 px-4 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-200"
-                      >
-                          {t('close')}
-                      </button>
-                  </div>
               </div>
           </div>
       )}
