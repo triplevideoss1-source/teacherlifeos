@@ -149,8 +149,10 @@ const Dashboard: React.FC<Props> = ({ state, updateState, prayerTimes, setView }
   const [isListening, setIsListening] = useState(false);
   const [quote, setQuote] = useState('');
   const [dailyWisdom, setDailyWisdom] = useState(ISLAMIC_DAILY[0]);
-// Task State
-   const [taskTab, setTaskTab] = useState<'active' | 'history'>('active');
+    const [mobileDashboardSection, setMobileDashboardSection] = useState<'today' | 'faith' | 'reflect'>('today');
+  
+  // Task State
+  const [taskTab, setTaskTab] = useState<'active' | 'history'>('active');
   const [newTaskPriority, setNewTaskPriority] = useState<'low'|'medium'|'high'>('medium');
   const [newTaskCategory, setNewTaskCategory] = useState<'work'|'personal'|'urgent'>('personal');
   const [schedulingTaskId, setSchedulingTaskId] = useState<string | null>(null);
@@ -649,24 +651,46 @@ const Dashboard: React.FC<Props> = ({ state, updateState, prayerTimes, setView }
               </div>
           </div>
 
-<div className="col-span-2 md:col-span-1 flex bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-4 rounded-[2rem] items-center gap-4 shadow-sm group hover:shadow-md transition-all">
-                 <div className="w-10 h-10 rounded-2xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-                     <CheckCircle2 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                 </div>
-                 <div className="min-w-0">
-                     <span className="text-[9px] uppercase font-bold text-slate-400 dark:text-slate-500 block tracking-widest mb-0.5">{t('activeTasks')}</span>
-                     <div className="flex items-baseline gap-1.5">
-                       <span className="text-sm font-bold text-slate-800 dark:text-slate-100">{activeTaskCount}</span>
-                       <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400">{t('remaining')}</span>
-                     </div>
-                 </div>
-             </div>
+          <div className="col-span-2 md:col-span-1 flex bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-4 rounded-[2rem] items-center gap-4 shadow-sm group hover:shadow-md transition-all">
+              <div className="w-10 h-10 rounded-2xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                  <CheckCircle2 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div className="min-w-0">
+                  <span className="text-[9px] uppercase font-bold text-slate-400 dark:text-slate-500 block tracking-widest mb-0.5">{t('activeTasks')}</span>
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-sm font-bold text-slate-800 dark:text-slate-100">{activeTaskCount}</span>
+                    <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400">{t('remaining')}</span>
+                  </div>
+              </div>
+          </div>
+      </div>
 
-       {/* Main Grid Layout - Flex Col on Mobile (Reordered), Grid on Desktop */}
+            <div className="md:hidden flex bg-white dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm gap-1">
+                    <button
+                        onClick={() => setMobileDashboardSection('today')}
+                        className={`flex-1 px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-[0.18em] transition-all ${mobileDashboardSection === 'today' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'text-slate-500 dark:text-slate-400'}`}
+                    >
+                        {t('dashboard')}
+                    </button>
+                    <button
+                        onClick={() => setMobileDashboardSection('faith')}
+                        className={`flex-1 px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-[0.18em] transition-all ${mobileDashboardSection === 'faith' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'text-slate-500 dark:text-slate-400'}`}
+                    >
+                        {t('muslim')}
+                    </button>
+                    <button
+                        onClick={() => setMobileDashboardSection('reflect')}
+                        className={`flex-1 px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-[0.18em] transition-all ${mobileDashboardSection === 'reflect' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'text-slate-500 dark:text-slate-400'}`}
+                    >
+                        {t('muhasabah')}
+                    </button>
+            </div>
+
+      {/* Main Grid Layout - Flex Col on Mobile (Reordered), Grid on Desktop */}
     <div className="flex flex-col lg:grid lg:grid-cols-3 gap-4 md:gap-6 items-start">
         
         {/* COLUMN 1: SPIRITUALITY & ROUTINE */}
-                <div className="space-y-4 md:space-y-6 w-full order-2 lg:order-1 block lg:block">
+                <div className={`space-y-4 md:space-y-6 w-full order-2 lg:order-1 ${mobileDashboardSection === 'faith' ? 'block' : 'hidden'} lg:block`}>
             
             <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory pb-1 -mx-1 px-1 lg:grid lg:grid-cols-1 lg:overflow-visible lg:snap-none lg:p-0 lg:mx-0 lg:gap-6">
                 {/* Daily Islamic Wisdom */}
@@ -772,7 +796,7 @@ const Dashboard: React.FC<Props> = ({ state, updateState, prayerTimes, setView }
         </div>
 
         {/* COLUMN 2: WORK & ACTION (Primary Focus) */}
-        <div className="space-y-4 md:space-y-6 w-full order-1 lg:order-2 block lg:block">
+        <div className={`space-y-4 md:space-y-6 w-full order-1 lg:order-2 ${mobileDashboardSection === 'today' ? 'block' : 'hidden'} lg:block`}>
             
             {/* Today's Schedule */}
             <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-5 md:p-8 rounded-[2rem] md:rounded-[2.5rem] shadow-sm">
@@ -1074,7 +1098,7 @@ const Dashboard: React.FC<Props> = ({ state, updateState, prayerTimes, setView }
                 </div>
             </div>
         </div>
-        <div className="space-y-4 md:space-y-6 w-full order-3 block lg:block">
+        <div className={`space-y-4 md:space-y-6 w-full order-3 ${mobileDashboardSection === 'reflect' ? 'block' : 'hidden'} lg:block`}>
 
             <div className="grid grid-cols-1 gap-6">
                 {/* MUHASABAH (DAILY REFLECTION) */}
