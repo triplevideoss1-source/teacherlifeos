@@ -1102,42 +1102,11 @@ const Dashboard: React.FC<Props> = ({ state, updateState, prayerTimes, setView }
 
             <div className="grid grid-cols-1 gap-6">
                 {/* MUHASABAH (DAILY REFLECTION) */}
-<div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-5 md:p-8 rounded-[2rem] md:rounded-[2.5rem] shadow-sm transition-all hover:shadow-md">
-                <div className="flex items-center gap-3">
-                    <div className="p-2 bg-slate-100 dark:bg-slate-800/30 rounded-xl">
-                        <Mic className="w-5 h-5 text-slate-600 dark:text-slate-400" />
-                    </div>
-                    <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-3">
-                        <div className="p-2 bg-slate-100 dark:bg-slate-800/30 rounded-xl">
-                            <Brain className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+                <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-5 md:p-8 rounded-[2rem] md:rounded-[2.5rem] shadow-sm transition-all hover:shadow-md">
+                    <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-3 mb-8">
+                        <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-xl">
+                            <BookHeart className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
                         </div>
-                        Brain Dumb
-                    </h3>
-                </div>
-                <div className="mt-4">
-                    <textarea 
-                        className="w-full p-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-2xl focus:ring-2 focus:ring-slate-500/20 focus:bg-white dark:focus:bg-slate-900 outline-none transition-all resize-none h-24 text-slate-800 dark:text-slate-200 placeholder:text-slate-400 text-sm"
-                        placeholder="Quick, unfiltered thoughts..."
-                        value={brainInput}
-                        onChange={(e) => setBrainInput(e.target.value)}
-                    ></textarea>
-                    <div className="flex justify-end gap-2 mt-3">
-                        <button 
-                            onClick={() => setBrainInput('')}
-                            className="text-xs font-bold text-slate-500 hover:text-slate-700 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 transition-colors"
-                        >
-                            Clear
-                        </button>
-                        <button 
-                            onClick={addBrainDump}
-                            disabled={processing || !brainInput.trim()}
-                            className="px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:opacity-90 transition-all shadow-lg shadow-slate-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {processing ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Capture'}
-                        </button>
-                    </div>
-                </div>
-            </div>
                         {t('muhasabah')}
                     </h2>
                     
